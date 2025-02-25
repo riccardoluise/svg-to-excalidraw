@@ -170,7 +170,7 @@
             <div class="radio-group">
                 <input type="radio" id="rounded-remove" name="rounded-corners" value="remove">
                 <label for="rounded-remove">Togli angoli arrotondati</label>
-            </div>
+            </div>        
         </div>
         
         <div class="setting-group">
@@ -269,7 +269,7 @@
                     let [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight] = [0, 0, parseFloat(width), parseFloat(height)];
                     
                     if (viewBox) {
-                        const viewBoxValues = viewBox.split(/\\s+/).map(parseFloat);
+                        const viewBoxValues = viewBox.split(/\s+/).map(parseFloat);
                         if (viewBoxValues.length === 4) {
                             [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight] = viewBoxValues;
                         }
@@ -395,10 +395,10 @@
                 // Controlla se ci sono trasformazioni di rotazione
                 let angle = 0;
                 if (transform) {
-                    const rotateMatch = transform.match(/rotate\\(([^)]+)\\)/);
+                    const rotateMatch = transform.match(/rotate\(([^)]+)\)/);
                     if (rotateMatch && rotateMatch[1]) {
                         // Prendi il primo valore che è l'angolo
-                        const rotateParams = rotateMatch[1].split(/[\\s,]+/);
+                        const rotateParams = rotateMatch[1].split(/[\s,]+/);
                         angle = parseFloat(rotateParams[0]) || 0;
                         // Converti in radianti per Excalidraw
                         angle = (angle * Math.PI) / 180;
@@ -434,7 +434,7 @@
                     roughness: defaultRoughness,
                     opacity: parseFloat(element.getAttribute('opacity') || '1') * 100,
                     groupIds: [],
-                    strokeSharpness: 'round',
+                    strokeSharpness: 'sharp', // Impostato come sharp per tutti gli elementi
                     seed: Math.floor(Math.random() * 2000000000),
                     version: 1,
                     versionNonce: Math.floor(Math.random() * 2000000000),
@@ -443,7 +443,8 @@
                     updated: Date.now(),
                     link: null,
                     locked: false,
-                    fontWeight: fontWeight
+                    fontWeight: fontWeight,
+                    roundness: null // Default a null per elementi non arrotondati
                 };
                 
                 // Gestisci diversi tipi di elementi SVG
@@ -481,16 +482,20 @@
                 let ry = parseFloat(element.getAttribute('ry') || element.getAttribute('rx') || '0');
                 
                 // Applica le regole per gli angoli arrotondati
+                let hasRoundedCorners = false;
                 if (roundedCornersOption === 'remove') {
                     rx = 0;
                     ry = 0;
                 } else if (roundedCornersOption === 'threshold') {
                     if (rx > thresholdValue) rx = 0;
                     if (ry > thresholdValue) ry = 0;
+                    hasRoundedCorners = (rx > 0 || ry > 0);
+                } else { // 'keep'
+                    hasRoundedCorners = (rx > 0 || ry > 0);
                 }
                 
-                // Converti rx/ry a un valore di borderRadius per Excalidraw (percentuale del lato più corto)
-                const borderRadius = Math.min(rx, ry);
+                // In Excalidraw moderno, gli angoli arrotondati sono gestiti con la proprietà roundness
+                const roundness = hasRoundedCorners ? { type: 3 } : null;
                 
                 return {
                     ...baseElement,
@@ -500,7 +505,8 @@
                     width: width,
                     height: height,
                     points: [],
-                    borderRadius: borderRadius
+                    borderRadius: 0,
+                    roundness: roundness
                 };
             }
             
@@ -847,7 +853,9 @@
                     fontFamily: fontFamily,
                     textAlign: textAlign,
                     verticalAlign: verticalAlign,
-                    fontWeight: baseElement.fontWeight // Mantieni il font weight dal baseElement
+                    fontWeight: baseElement.fontWeight, // Mantieni il font weight dal baseElement
+                    // Add null roundness for text elements as well
+                    roundness: null
                 };
             }
             
