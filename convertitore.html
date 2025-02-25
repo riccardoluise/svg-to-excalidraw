@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Convertitore SVG → Excalidraw JSON</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .converter-box {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .input-area, .output-area {
+            flex: 1;
+            min-width: 300px;
+        }
+        textarea {
+            width: 100%;
+            height: 300px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            resize: vertical;
+            background-color: #fff;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        button {
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #1a252f;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .status {
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            display: none;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            display: none;
+        }
+        .instructions {
+            background-color: #e7f5ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .setting-group {
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .setting-group h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            font-size: 16px;
+            color: #2c3e50;
+        }
+        .radio-group {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        .radio-group label {
+            margin-left: 8px;
+            user-select: none;
+        }
+        .threshold-input {
+            margin-left: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .threshold-input input {
+            width: 60px;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Convertitore SVG → Excalidraw JSON</h1>
+    
+    <div class="container">
+        <div class="instructions card">
+            <h3>Istruzioni</h3>
+            <p>Questo strumento converte codice SVG in formato JSON compatibile con Excalidraw:</p>
+            <ol>
+                <li>Incolla il codice SVG nel campo di testo a sinistra</li>
+                <li>Configura come gestire gli angoli arrotondati</li>
+                <li>Clicca sul pulsante "Converti in Excalidraw"</li>
+                <li>Ottieni il risultato nel formato JSON di Excalidraw a destra</li>
+                <li>Usa i pulsanti per copiare il risultato o esportarlo come file .excalidraw</li>
+            </ol>
+        </div>
+        
+        <div class="setting-group">
+            <h3>Gestione angoli arrotondati</h3>
+            <div class="radio-group">
+                <input type="radio" id="rounded-keep" name="rounded-corners" value="keep">
+                <label for="rounded-keep">Mantieni angoli arrotondati</label>
+            </div>
+            <div class="radio-group">
+                <input type="radio" id="rounded-threshold" name="rounded-corners" value="threshold" checked>
+                <label for="rounded-threshold">Tieni solo quelli sotto una certa soglia</label>
+                <div class="threshold-input">
+                    <input type="number" id="threshold-value" value="10" min="0" max="100"> px
+                </div>
+            </div>
+            <div class="radio-group">
+                <input type="radio" id="rounded-remove" name="rounded-corners" value="remove">
+                <label for="rounded-remove">Togli angoli arrotondati</label>
+            </div>
+        </div>
+        
+        <div class="setting-group">
+            <h3>Stile artistico (Roughness)</h3>
+            <div class="radio-group">
+                <input type="radio" id="roughness-0" name="default-roughness" value="0" checked>
+                <label for="roughness-0">Preciso (0)</label>
+            </div>
+            <div class="radio-group">
+                <input type="radio" id="roughness-1" name="default-roughness" value="1">
+                <label for="roughness-1">Standard (1)</label>
+            </div>
+            <div class="radio-group">
+                <input type="radio" id="roughness-2" name="default-roughness" value="2">
+                <label for="roughness-2">Artistico (2)</label>
+            </div>
+        </div>
+        
+        <div class="converter-box">
+            <div class="input-area card">
+                <div class="header">
+                    <h2>Codice SVG</h2>
+                    <button id="clear-input">Cancella</button>
+                </div>
+                <textarea id="svg-input" placeholder="Incolla qui il tuo codice SVG..."></textarea>
+            </div>
+            
+            <div class="output-area card">
+                <div class="header">
+                    <h2>JSON Excalidraw</h2>
+                    <button id="clear-output">Cancella</button>
+                </div>
+                <textarea id="json-output" placeholder="Il risultato della conversione apparirà qui..." readonly></textarea>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="convert-btn">Converti in Excalidraw</button>
+            <button id="copy-btn" disabled>Copia negli appunti</button>
+            <button id="export-btn" disabled>Esporta file .excalidraw</button>
+        </div>
+        
+        <div id="success-message" class="status success">
+            Operazione completata con successo!
+        </div>
+        <div id="error-message" class="status error">
+            Si è verificato un errore durante la conversione.
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const svgInput = document.getElementById('svg-input');
+            const jsonOutput = document.getElementById('json-output');
+            const convertBtn = document.getElementById('convert-btn');
+            const copyBtn = document.getElementById('copy-btn');
+            const exportBtn = document.getElementById('export-btn');
+            const clearInputBtn = document.getElementById('clear-input');
+            const clearOutputBtn = document.getElementById('clear-output');
+            const successMessage = document.getElementById('success-message');
+            const errorMessage = document.getElementById('error-message');
+            const thresholdInput = document.getElementById('threshold-value');
+            
+            // Mostra/nascondi campo threshold in base alla selezione
+            document.querySelectorAll('input[name="rounded-corners"]').forEach(radio => {
+                radio.addEventListener('change', function() {
+                    const thresholdDiv = document.querySelector('.threshold-input');
+                    thresholdDiv.style.display = (this.value === 'threshold') ? 'flex' : 'none';
+                });
+            });
+            
+            // Funzione per convertire SVG in JSON Excalidraw
+            function convertSvgToExcalidraw(svgCode) {
+                try {
+                    // Crea un parser per l'SVG
+                    const parser = new DOMParser();
+                    const svgDoc = parser.parseFromString(svgCode, 'image/svg+xml');
+                    
+                    // Controlla se ci sono errori nel parsing
+                    const parserError = svgDoc.querySelector('parsererror');
+                    if (parserError) {
+                        throw new Error('SVG non valido: ' + parserError.textContent);
+                    }
+                    
+                    // Ottieni l'elemento root SVG
+                    const svgElement = svgDoc.querySelector('svg');
+                    if (!svgElement) {
+                        throw new Error('Elemento SVG non trovato');
+                    }
+                    
+                    // Estrai attributi principali
+                    const viewBox = svgElement.getAttribute('viewBox') || '';
+                    const width = svgElement.getAttribute('width') || '800';
+                    const height = svgElement.getAttribute('height') || '600';
+                    
+                    let [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight] = [0, 0, parseFloat(width), parseFloat(height)];
+                    
+                    if (viewBox) {
+                        const viewBoxValues = viewBox.split(/\\s+/).map(parseFloat);
+                        if (viewBoxValues.length === 4) {
+                            [viewBoxX, viewBoxY, viewBoxWidth, viewBoxHeight] = viewBoxValues;
+                        }
+                    }
+                    
+                    // Ottieni il valore di roughness selezionato
+                    const defaultRoughness = parseInt(document.querySelector('input[name="default-roughness"]:checked').value);
+                    
+                    // Ottieni impostazioni per angoli arrotondati
+                    const roundedCornersOption = document.querySelector('input[name="rounded-corners"]:checked').value;
+                    const thresholdValue = parseInt(thresholdInput.value || '10');
+                    
+                    // Inizializza l'oggetto Excalidraw
+                    const excalidrawJSON = {
+                        type: 'excalidraw',
+                        version: 2,
+                        source: 'svg-converter',
+                        elements: [],
+                        appState: {
+                            viewBackgroundColor: '#ffffff',
+                            gridSize: null
+                        }
+                    };
+                    
+                    // Raccogli tutti i marker definiti (per le frecce)
+                    const markers = {};
+                    const defsElements = svgDoc.querySelectorAll('defs marker');
+                    defsElements.forEach(marker => {
+                        const id = marker.getAttribute('id');
+                        if (id) {
+                            markers[id] = {
+                                id: id,
+                                refX: parseFloat(marker.getAttribute('refX') || '0'),
+                                refY: parseFloat(marker.getAttribute('refY') || '0'),
+                                markerWidth: parseFloat(marker.getAttribute('markerWidth') || '10'),
+                                markerHeight: parseFloat(marker.getAttribute('markerHeight') || '7'),
+                                orient: marker.getAttribute('orient') || 'auto'
+                            };
+                        }
+                    });
+                    
+                    // Converti elementi SVG
+                    const elements = Array.from(svgDoc.querySelectorAll('path, rect, circle, ellipse, line, polyline, polygon, text'));
+                    
+                    elements.forEach((element, index) => {
+                        const excalidrawElement = convertSvgElementToExcalidraw(
+                            element, 
+                            index, 
+                            defaultRoughness, 
+                            roundedCornersOption, 
+                            thresholdValue,
+                            markers
+                        );
+                        if (excalidrawElement) {
+                            excalidrawJSON.elements.push(excalidrawElement);
+                        }
+                    });
+                    
+                    return JSON.stringify(excalidrawJSON, null, 2);
+                } catch (error) {
+                    throw new Error('Errore durante la conversione: ' + error.message);
+                }
+            }
+            
+            // Funzione per verificare se un elemento ha marker (frecce)
+            function hasMarker(element, markerType) {
+                // Verifica attributo diretto
+                let markerAttr = element.getAttribute(markerType);
+                if (markerAttr) return true;
+                
+                // Verifica nello stile
+                const style = element.getAttribute('style') || '';
+                if (style.includes(markerType)) return true;
+                
+                return false;
+            }
+            
+            // Funzione per estrarre ID marker da URL
+            function extractMarkerIdFromUrl(url) {
+                if (!url) return null;
+                // Ad esempio, da 'url(#arrowhead)' estrae 'arrowhead'
+                const match = url.match(/url\(#([^)]+)\)/);
+                return match ? match[1] : null;
+            }
+            
+            // Funzione per convertire un singolo elemento SVG in elemento Excalidraw
+            function convertSvgElementToExcalidraw(element, index, defaultRoughness, roundedCornersOption, thresholdValue, markers) {
+                const type = element.tagName.toLowerCase();
+                const id = element.id || `element-${index}`;
+                const fill = element.getAttribute('fill') || 'transparent';
+                const stroke = element.getAttribute('stroke') || '#000000';
+                const strokeWidth = parseFloat(element.getAttribute('stroke-width') || '1');
+                const transform = element.getAttribute('transform') || '';
+                
+                // Verifica se l'elemento ha marker per frecce
+                const hasStartArrow = hasMarker(element, 'marker-start');
+                const hasEndArrow = hasMarker(element, 'marker-end');
+                const isArrow = hasStartArrow || hasEndArrow;
+                
+                // Gestione del tipo di tratto
+                let strokeStyle = 'solid'; // default
+                
+                // Verifica stile del tratto
+                const strokeDasharray = element.getAttribute('stroke-dasharray');
+                if (strokeDasharray) {
+                    if (strokeDasharray.includes('0') || strokeDasharray.includes('1,1') || strokeDasharray === '1 1') {
+                        strokeStyle = 'dotted';
+                    } else {
+                        strokeStyle = 'dashed';
+                    }
+                }
+                
+                // Verifica anche classe e style per dotted/dashed
+                const className = element.getAttribute('class') || '';
+                const style = element.getAttribute('style') || '';
+                
+                if (className.includes('dotted') || style.includes('dotted')) {
+                    strokeStyle = 'dotted';
+                } else if (className.includes('dashed') || style.includes('dashed')) {
+                    strokeStyle = 'dashed';
+                }
+                
+                // Controlla se ci sono trasformazioni di rotazione
+                let angle = 0;
+                if (transform) {
+                    const rotateMatch = transform.match(/rotate\\(([^)]+)\\)/);
+                    if (rotateMatch && rotateMatch[1]) {
+                        // Prendi il primo valore che è l'angolo
+                        const rotateParams = rotateMatch[1].split(/[\\s,]+/);
+                        angle = parseFloat(rotateParams[0]) || 0;
+                        // Converti in radianti per Excalidraw
+                        angle = (angle * Math.PI) / 180;
+                    }
+                }
+                
+                // Rileva se il testo è in grassetto
+                let fontWeight = 'normal';
+                if (type === 'text') {
+                    const fontWeightAttr = element.getAttribute('font-weight');
+                    const styleAttr = element.getAttribute('style') || '';
+                    
+                    if (fontWeightAttr === 'bold' || styleAttr.includes('font-weight: bold') || 
+                        className.includes('bold') || styleAttr.includes('font-weight:bold')) {
+                        fontWeight = 'bold';
+                    }
+                }
+                
+                // Oggetto base per elemento Excalidraw
+                const baseElement = {
+                    id: id,
+                    type: 'draw', // Tipo di default, verrà sovrascritto per alcuni elementi
+                    x: 0,
+                    y: 0,
+                    width: 0,
+                    height: 0,
+                    angle: angle,
+                    strokeColor: stroke,
+                    backgroundColor: fill !== 'none' ? fill : 'transparent',
+                    fillStyle: fill !== 'none' ? 'solid' : 'hachure',
+                    strokeWidth: strokeWidth,
+                    strokeStyle: strokeStyle,
+                    roughness: defaultRoughness,
+                    opacity: parseFloat(element.getAttribute('opacity') || '1') * 100,
+                    groupIds: [],
+                    strokeSharpness: 'round',
+                    seed: Math.floor(Math.random() * 2000000000),
+                    version: 1,
+                    versionNonce: Math.floor(Math.random() * 2000000000),
+                    isDeleted: false,
+                    boundElements: null,
+                    updated: Date.now(),
+                    link: null,
+                    locked: false,
+                    fontWeight: fontWeight
+                };
+                
+                // Gestisci diversi tipi di elementi SVG
+                switch (type) {
+                    case 'rect':
+                        return convertRect(element, baseElement, roundedCornersOption, thresholdValue);
+                    case 'circle':
+                        return convertCircle(element, baseElement);
+                    case 'ellipse':
+                        return convertEllipse(element, baseElement);
+                    case 'line':
+                        return convertLine(element, baseElement, hasStartArrow, hasEndArrow);
+                    case 'path':
+                        return convertPath(element, baseElement, hasStartArrow, hasEndArrow);
+                    case 'polyline':
+                        return convertPolyline(element, baseElement, hasStartArrow, hasEndArrow);
+                    case 'polygon':
+                        return convertPolygon(element, baseElement);
+                    case 'text':
+                        return convertText(element, baseElement);
+                    default:
+                        return null;
+                }
+            }
+            
+            // Funzioni specifiche per ogni tipo di elemento
+            function convertRect(element, baseElement, roundedCornersOption, thresholdValue) {
+                const x = parseFloat(element.getAttribute('x') || '0');
+                const y = parseFloat(element.getAttribute('y') || '0');
+                const width = parseFloat(element.getAttribute('width') || '0');
+                const height = parseFloat(element.getAttribute('height') || '0');
+                
+                // Gestione angoli arrotondati
+                let rx = parseFloat(element.getAttribute('rx') || element.getAttribute('ry') || '0');
+                let ry = parseFloat(element.getAttribute('ry') || element.getAttribute('rx') || '0');
+                
+                // Applica le regole per gli angoli arrotondati
+                if (roundedCornersOption === 'remove') {
+                    rx = 0;
+                    ry = 0;
+                } else if (roundedCornersOption === 'threshold') {
+                    if (rx > thresholdValue) rx = 0;
+                    if (ry > thresholdValue) ry = 0;
+                }
+                
+                // Converti rx/ry a un valore di borderRadius per Excalidraw (percentuale del lato più corto)
+                const borderRadius = Math.min(rx, ry);
+                
+                return {
+                    ...baseElement,
+                    type: 'rectangle',
+                    x: x,
+                    y: y,
+                    width: width,
+                    height: height,
+                    points: [],
+                    borderRadius: borderRadius
+                };
+            }
+            
+            function convertCircle(element, baseElement) {
+                const cx = parseFloat(element.getAttribute('cx') || '0');
+                const cy = parseFloat(element.getAttribute('cy') || '0');
+                const r = parseFloat(element.getAttribute('r') || '0');
+                
+                return {
+                    ...baseElement,
+                    type: 'ellipse',
+                    x: cx - r,
+                    y: cy - r,
+                    width: r * 2,
+                    height: r * 2,
+                    points: [],
+                    // Proprietà aggiunte per mantenere il centro in Excalidraw
+                    position: "center"
+                };
+            }
+            
+            function convertEllipse(element, baseElement) {
+                const cx = parseFloat(element.getAttribute('cx') || '0');
+                const cy = parseFloat(element.getAttribute('cy') || '0');
+                const rx = parseFloat(element.getAttribute('rx') || '0');
+                const ry = parseFloat(element.getAttribute('ry') || '0');
+                
+                return {
+                    ...baseElement,
+                    type: 'ellipse',
+                    x: cx - rx,
+                    y: cy - ry,
+                    width: rx * 2,
+                    height: ry * 2,
+                    points: [],
+                    // Proprietà aggiunta per mantenere il centro in Excalidraw
+                    position: "center"
+                };
+            }
+            
+            function convertLine(element, baseElement, hasStartArrow, hasEndArrow) {
+                const x1 = parseFloat(element.getAttribute('x1') || '0');
+                const y1 = parseFloat(element.getAttribute('y1') || '0');
+                const x2 = parseFloat(element.getAttribute('x2') || '0');
+                const y2 = parseFloat(element.getAttribute('y2') || '0');
+                
+                // Calcola bounding box
+                const minX = Math.min(x1, x2);
+                const minY = Math.min(y1, y2);
+                const maxX = Math.max(x1, x2);
+                const maxY = Math.max(y1, y2);
+                
+                // Normalizza i punti relativi all'origine della bounding box
+                const normalizedPoints = [
+                    [x1 - minX, y1 - minY],
+                    [x2 - minX, y2 - minY]
+                ];
+                
+                return {
+                    ...baseElement,
+                    type: hasStartArrow || hasEndArrow ? 'arrow' : 'line',
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY,
+                    points: normalizedPoints,
+                    startArrowhead: hasStartArrow ? "arrow" : null,
+                    endArrowhead: hasEndArrow ? "arrow" : null
+                };
+            }
+            
+            function convertPath(element, baseElement, hasStartArrow, hasEndArrow) {
+                const d = element.getAttribute('d') || '';
+                
+                // Verifica se il path potrebbe essere una freccia
+                const isArrow = hasStartArrow || hasEndArrow || d.includes('marker-end') || d.includes('marker-start');
+                
+                // Analizza il path per estrarre i punti
+                const pathPoints = extractPointsFromPath(d);
+                
+                if (pathPoints.length === 0) return null;
+                
+                // Calcola la bounding box
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                
+                pathPoints.forEach(([x, y]) => {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                });
+                
+                // Normalizza i punti relativi all'origine della bounding box
+                const normalizedPoints = pathPoints.map(([x, y]) => [x - minX, y - minY]);
+                
+                // Verifica se il path è un segno di spunta (checkmark)
+                const isCheckmark = (pathPoints.length <= 4 && d.includes('M') && d.includes('L') && 
+                                    !d.includes('C') && !isArrow);
+                
+                return {
+                    ...baseElement,
+                    type: isArrow ? 'arrow' : (isCheckmark ? 'freedraw' : 'line'),
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY,
+                    points: normalizedPoints,
+                    startArrowhead: hasStartArrow ? "arrow" : null,
+                    endArrowhead: hasEndArrow ? "arrow" : null
+                };
+            }
+            
+            function extractPointsFromPath(d) {
+                const points = [];
+                let currentX = 0, currentY = 0;
+                
+                // Espressione regolare per estrarre comandi e parametri
+                const commands = d.match(/[a-zA-Z][^a-zA-Z]*/g) || [];
+                
+                commands.forEach(cmd => {
+                    const type = cmd[0];
+                    const args = cmd.substring(1).trim().split(/[\s,]+/).map(parseFloat).filter(n => !isNaN(n));
+                    
+                    switch (type) {
+                        case 'M': // MoveTo assoluto
+                            if (args.length >= 2) {
+                                currentX = args[0];
+                                currentY = args[1];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'm': // MoveTo relativo
+                            if (args.length >= 2) {
+                                currentX += args[0];
+                                currentY += args[1];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'L': // LineTo assoluto
+                            if (args.length >= 2) {
+                                currentX = args[0];
+                                currentY = args[1];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'l': // LineTo relativo
+                            if (args.length >= 2) {
+                                currentX += args[0];
+                                currentY += args[1];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'H': // LineTo orizzontale assoluto
+                            if (args.length >= 1) {
+                                currentX = args[0];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'h': // LineTo orizzontale relativo
+                            if (args.length >= 1) {
+                                currentX += args[0];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'V': // LineTo verticale assoluto
+                            if (args.length >= 1) {
+                                currentY = args[0];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'v': // LineTo verticale relativo
+                            if (args.length >= 1) {
+                                currentY += args[0];
+                                points.push([currentX, currentY]);
+                            }
+                            break;
+                        case 'C': // Bezier Curve assoluto (cubico)
+                            if (args.length >= 6) {
+                                const x1 = args[0], y1 = args[1];
+                                const x2 = args[2], y2 = args[3];
+                                const x = args[4], y = args[5];
+                                // Aggiungiamo solo i punti di controllo e quello finale
+                                points.push([x1, y1], [x2, y2], [x, y]);
+                                currentX = x;
+                                currentY = y;
+                            }
+                            break;
+                        case 'c': // Bezier Curve relativo (cubico)
+                            if (args.length >= 6) {
+                                const x1 = currentX + args[0], y1 = currentY + args[1];
+                                const x2 = currentX + args[2], y2 = currentY + args[3];
+                                const x = currentX + args[4], y = currentY + args[5];
+                                // Aggiungiamo solo i punti di controllo e quello finale
+                                points.push([x1, y1], [x2, y2], [x, y]);
+                                currentX = x;
+                                currentY = y;
+                            }
+                            break;
+                        case 'S': // Smooth Bezier Curve assoluto (cubico)
+                        case 's': // Smooth Bezier Curve relativo (cubico)
+                        case 'Q': // Quadratic Bezier Curve assoluto
+                        case 'q': // Quadratic Bezier Curve relativo
+                        case 'T': // Smooth Quadratic Bezier Curve assoluto
+                        case 't': // Smooth Quadratic Bezier Curve relativo
+                        case 'A': // Arco ellittico assoluto
+                        case 'a': // Arco ellittico relativo
+                            // Per questi comandi più complessi, potrebbe essere necessario
+                            // un'implementazione più sofisticata per estrarre i punti correttamente
+                            break;
+                        case 'Z': // Close path
+                        case 'z': // Close path
+                            // Per chiudere il percorso, torniamo al primo punto
+                            if (points.length > 0) {
+                                points.push([points[0][0], points[0][1]]);
+                            }
+                            break;
+                    }
+                });
+                
+                return points;
+            }
+            
+            function convertPolyline(element, baseElement, hasStartArrow, hasEndArrow) {
+                const points = element.getAttribute('points') || '';
+                const pointPairs = points.trim().split(/[\s,]+/).reduce((result, value, index, array) => {
+                    if (index % 2 === 0) {
+                        result.push([parseFloat(value), parseFloat(array[index + 1] || 0)]);
+                    }
+                    return result;
+                }, []);
+                
+                if (pointPairs.length < 2) return null;
+                
+                // Calcola la bounding box
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                
+                pointPairs.forEach(([x, y]) => {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                });
+                
+                // Normalizza i punti relativi all'origine della bounding box
+                const normalizedPoints = pointPairs.map(([x, y]) => [x - minX, y - minY]);
+                
+                // Determina se è una freccia
+                const isArrow = hasStartArrow || hasEndArrow || normalizedPoints.length === 2;
+                
+                return {
+                    ...baseElement,
+                    type: isArrow ? 'arrow' : 'line',
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY,
+                    points: normalizedPoints,
+                    startArrowhead: hasStartArrow ? "arrow" : null,
+                    endArrowhead: hasEndArrow ? "arrow" : null
+                };
+            }
+            
+            function convertPolygon(element, baseElement) {
+                const points = element.getAttribute('points') || '';
+                const pointPairs = points.trim().split(/[\s,]+/).reduce((result, value, index, array) => {
+                    if (index % 2 === 0) {
+                        result.push([parseFloat(value), parseFloat(array[index + 1] || 0)]);
+                    }
+                    return result;
+                }, []);
+                
+                if (pointPairs.length < 3) return null;
+                
+                // Calcola la bounding box
+                let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                
+                pointPairs.forEach(([x, y]) => {
+                    minX = Math.min(minX, x);
+                    minY = Math.min(minY, y);
+                    maxX = Math.max(maxX, x);
+                    maxY = Math.max(maxY, y);
+                });
+                
+                // Normalizza i punti relativi all'origine della bounding box
+                const normalizedPoints = pointPairs.map(([x, y]) => [x - minX, y - minY]);
+                
+                return {
+                    ...baseElement,
+                    type: 'polygon',
+                    x: minX,
+                    y: minY,
+                    width: maxX - minX,
+                    height: maxY - minY,
+                    points: normalizedPoints
+                };
+            }
+            
+            function convertText(element, baseElement) {
+                const x = parseFloat(element.getAttribute('x') || '0');
+                const y = parseFloat(element.getAttribute('y') || '0');
+                const fontSize = parseFloat(element.getAttribute('font-size') || '16');
+                const fontFamily = element.getAttribute('font-family') || 'Arial';
+                const textContent = element.textContent || '';
+                const textAnchor = element.getAttribute('text-anchor') || 'start';
+                const dominantBaseline = element.getAttribute('dominant-baseline') || 'auto';
+                
+                // Calcola la larghezza e altezza approssimativa del testo
+                const textWidth = textContent.length * fontSize * 0.6; // Approssimazione
+                const textHeight = fontSize * 1.2;
+                
+                // Adatta la posizione in base all'ancoraggio del testo in SVG
+                let adjustedX = x;
+                let adjustedY = y - textHeight; // Compensazione per la linea di base
+                
+                // Gestisci text-anchor (allineamento orizzontale)
+                let textAlign = 'left';
+                if (textAnchor === 'middle') {
+                    adjustedX = x - (textWidth / 2);
+                    textAlign = 'center';
+                } else if (textAnchor === 'end') {
+                    adjustedX = x - textWidth;
+                    textAlign = 'right';
+                }
+                
+                // Gestisci dominant-baseline (allineamento verticale)
+                let verticalAlign = 'top';
+                if (dominantBaseline === 'middle') {
+                    adjustedY = y - (textHeight / 2);
+                    verticalAlign = 'middle';
+                } else if (dominantBaseline === 'hanging') {
+                    adjustedY = y;
+                    verticalAlign = 'top';
+                }
+                
+                return {
+                    ...baseElement,
+                    type: 'text',
+                    x: adjustedX,
+                    y: adjustedY,
+                    width: textWidth,
+                    height: textHeight,
+                    text: textContent,
+                    fontSize: fontSize,
+                    fontFamily: fontFamily,
+                    textAlign: textAlign,
+                    verticalAlign: verticalAlign,
+                    fontWeight: baseElement.fontWeight // Mantieni il font weight dal baseElement
+                };
+            }
+            
+            // Event listeners
+            convertBtn.addEventListener('click', function() {
+                const svgCode = svgInput.value.trim();
+                
+                if (!svgCode) {
+                    showError('Inserisci il codice SVG prima di convertire');
+                    return;
+                }
+                
+                try {
+                    const excalidrawJSON = convertSvgToExcalidraw(svgCode);
+                    jsonOutput.value = excalidrawJSON;
+                    
+                    // Abilita i pulsanti di copia ed esportazione
+                    copyBtn.disabled = false;
+                    exportBtn.disabled = false;
+                    
+                    showSuccess('Conversione completata con successo!');
+                } catch (error) {
+                    showError(error.message);
+                    jsonOutput.value = '';
+                    copyBtn.disabled = true;
+                    exportBtn.disabled = true;
+                }
+            });
+            
+            copyBtn.addEventListener('click', function() {
+                jsonOutput.select();
+                document.execCommand('copy');
+                
+                showSuccess('Copiato negli appunti!');
+            });
+            
+            exportBtn.addEventListener('click', function() {
+                const jsonContent = jsonOutput.value;
+                
+                if (!jsonContent) {
+                    showError('Nessun contenuto da esportare');
+                    return;
+                }
+                
+                const blob = new Blob([jsonContent], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'disegno.excalidraw';
+                document.body.appendChild(a);
+                a.click();
+                
+                setTimeout(function() {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 0);
+                
+                showSuccess('File .excalidraw esportato');
+            });
+            
+            clearInputBtn.addEventListener('click', function() {
+                svgInput.value = '';
+                svgInput.focus();
+            });
+            
+            clearOutputBtn.addEventListener('click', function() {
+                jsonOutput.value = '';
+                copyBtn.disabled = true;
+                exportBtn.disabled = true;
+            });
+            
+            // Funzioni per mostrare messaggi
+            function showSuccess(message) {
+                successMessage.textContent = message;
+                successMessage.style.display = 'block';
+                errorMessage.style.display = 'none';
+                
+                setTimeout(function() {
+                    successMessage.style.display = 'none';
+                }, 3000);
+            }
+            
+            function showError(message) {
+                errorMessage.textContent = message;
+                errorMessage.style.display = 'block';
+                successMessage.style.display = 'none';
+                
+                setTimeout(function() {
+                    errorMessage.style.display = 'none';
+                }, 3000);
+            }
+            
+            // Inizializza la UI
+            document.getElementById('rounded-threshold').dispatchEvent(new Event('change'));
+        });
+    </script>
+</body>
+</html>
